@@ -50,7 +50,7 @@ RUN pdm install && \
     rm -rf /root/.cache/pip
 
 # Copy Supervisor configuration
-COPY supervisord.conf /etc/supervisor/supervisord.conf
+COPY supervisord.conf /supervisor.conf
 COPY start.sh /start.sh
 
 # Set up log function
