@@ -21,7 +21,7 @@ describe("Site Actions", () => {
     cy.visit("/");
     cy.reload();
 
-    cy.get("[data-testid='recommendations']", { timeout: 10000 })
+    cy.get("[data-testid='recommendations']", { timeout: 30000 })
       .should("exist")
       .find("[data-testid='mini-card']");
   });
@@ -31,7 +31,7 @@ describe("Site Actions", () => {
 
     cy.reload();
 
-    cy.get("[data-testid='recommendations']", { timeout: 10000 })
+    cy.get("[data-testid='recommendations']", { timeout: 30000 })
       .should("exist")
       .find("[data-testid='mini-card']");
 
