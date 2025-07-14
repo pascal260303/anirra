@@ -1,20 +1,23 @@
-import hashlib
-from fastapi import APIRouter, HTTPException, Depends, Header
-from fastapi.responses import JSONResponse
-from fastapi.security import OAuth2PasswordRequestForm
-import sqlalchemy
-from sqlalchemy.orm import Session
-from datetime import timedelta
-import jwt
+# STL
 import uuid
+import random
+import hashlib
+from datetime import timedelta
 
-from saas_backend.auth.jwt_handler import JwtHandler
-from saas_backend.auth.database import get_db
-from saas_backend.auth.models import User, APIKey, BaseUser
+# PDM
+import jwt
+import sqlalchemy
+from fastapi import Header, Depends, APIRouter, HTTPException
+from sqlalchemy.orm import Session
+from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.responses import JSONResponse
+
+# LOCAL
 from saas_backend.logger import LOG
-from saas_backend.auth.constants import (
-    ACCESS_TOKEN_EXPIRE_MINUTES,
-)
+from saas_backend.auth.models import User, APIKey, BaseUser, Watchlist
+from saas_backend.auth.database import get_db
+from saas_backend.auth.constants import ACCESS_TOKEN_EXPIRE_MINUTES
+from saas_backend.auth.jwt_handler import JwtHandler
 from saas_backend.auth.user_manager import UserManager
 
 router = APIRouter()
@@ -59,7 +62,7 @@ async def logout_user(token: str = Header(..., alias="Authorization")):
             JwtHandler.remove_token(token)  # already expired
             return {"message": "User logged out successfully"}
 
-        if user is None:
+        if not user:
             raise HTTPException(status_code=401, detail="Invalid token")
 
     except jwt.PyJWTError as e:
@@ -74,12 +77,18 @@ async def logout_user(token: str = Header(..., alias="Authorization")):
 @router.post("/register")
 async def register_user(user: BaseUser, db: Session = Depends(get_db)):
     try:
+        new_user_id = random.randint(0, 999999)
+
         new_user = User(
             username=user.username,
             hashed_password=hashlib.sha256(user.password.encode()).hexdigest(),
+            id=new_user_id,
         )
 
+        new_watchlist = Watchlist(user_id=new_user_id)
+
         db.add(new_user)
+        db.add(new_watchlist)
         db.commit()
     except sqlalchemy.exc.IntegrityError:
         raise HTTPException(

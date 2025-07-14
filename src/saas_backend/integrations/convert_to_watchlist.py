@@ -1,10 +1,14 @@
-from typing import BinaryIO
+# STL
 import xml.etree.ElementTree as ET
-from sqlalchemy.orm import Session
-from saas_backend.auth.models import Watchlist, WatchlistToAnime, Anime
-from saas_backend.auth.database import get_db
-
+from typing import BinaryIO
 from logging import getLogger
+
+# PDM
+from sqlalchemy.orm import Session
+
+# LOCAL
+from saas_backend.auth.models import Anime, Watchlist, WatchlistToAnime
+from saas_backend.auth.database import get_db
 
 logger = getLogger(__name__)
 
@@ -27,7 +31,7 @@ def xml_to_watchlist(xml_file: BinaryIO, user_id: int):
 
     connection: Session = next(get_db())
 
-    watchlist = connection.query(Watchlist).filter(Watchlist.user_id == user_id).first()  # type: ignore
+    watchlist = connection.query(Watchlist).filter(Watchlist.user_id == user_id).first()
 
     if not watchlist:
         logger.info(f"Watchlist not found for user {user_id}, creating new watchlist")
@@ -42,7 +46,7 @@ def xml_to_watchlist(xml_file: BinaryIO, user_id: int):
 
     for anime in animes:
         status = convert_from_mal_status(anime.find("my_status").text or "")  # type: ignore
-        rating = anime.find("my_score").text or None  # type: ignore
+        rating = anime.find("my_score").text or 0  # type: ignore
 
         # Check if the anime already exists in the database
         existing_anime = connection.query(Anime).filter(Anime.title == anime.find("series_title").text).first()  # type: ignore
@@ -55,7 +59,14 @@ def xml_to_watchlist(xml_file: BinaryIO, user_id: int):
             logger.info(f"Anime did not exist in the database")
             continue
 
-        entry = connection.query(WatchlistToAnime).filter(WatchlistToAnime.watchlist_id == watchlist.id, WatchlistToAnime.anime_id == existing_anime.id).first()  # type: ignore
+        entry = (
+            connection.query(WatchlistToAnime)
+            .filter(
+                WatchlistToAnime.watchlist_id == watchlist.id,
+                WatchlistToAnime.anime_id == existing_anime.id,
+            )
+            .first()
+        )
 
         if entry:
             logger.info(f"Anime {existing_anime.title} already exists in the watchlist")

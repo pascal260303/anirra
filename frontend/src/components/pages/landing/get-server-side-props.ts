@@ -1,5 +1,4 @@
 import { getJwt } from "@/lib/utils";
-import { Anime } from "@/types/anime.types";
 
 import { GetServerSidePropsContext, NextApiRequest } from "next";
 
@@ -28,31 +27,10 @@ export default async function GetServerSideProps(
 
   const statsData = await stats.json();
 
-  const animeWatched = await fetch(
-    `${process.env.API_URL || "http://127.0.0.1:8000"}/anime/watchlists`,
-    {
-      headers: {
-        Authorization: `Bearer ${jwt.access_token}`,
-      },
-    }
-  );
-
-  const animeWatchedData = await animeWatched.json();
-  if (animeWatched.status === 401) {
-    return {
-      props: {
-        stats: statsData,
-        recommendedAnime: [],
-      },
-    };
-  }
-
   const animeRecommendations = await fetch(
     `${
       process.env.API_URL || "http://127.0.0.1:8000"
-    }/anime/recommendations?${animeWatchedData.anime
-      .map((anime: Anime) => `ids=${anime.id}`)
-      .join("&")}&limit=20`,
+    }/anime/recommendations?limit=20&from_watchlist=true`,
     {
       headers: {
         Authorization: `Bearer ${jwt.access_token}`,

@@ -1,14 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import JSONResponse
-from rapidfuzz import process, fuzz
+# PDM
+from fastapi import Query, Depends, APIRouter, HTTPException
+from rapidfuzz import fuzz, process
 from sqlalchemy.orm import Session
+from fastapi.responses import JSONResponse
 
-from saas_backend.anime.request_models import UpdateWatchlist
-from saas_backend.auth.database import get_db
-from saas_backend.auth.models import Anime, User, Watchlist, WatchlistToAnime
-from saas_backend.anime.utils import get_recommendations
-from saas_backend.auth.user_manager.user_manager import UserManager
+# LOCAL
 from saas_backend.utils import to_dict
+from saas_backend.anime.utils import get_recommendations, get_user_watched_anime
+from saas_backend.auth.models import User, Anime, Watchlist, WatchlistToAnime
+from saas_backend.auth.database import get_db
+from saas_backend.anime.request_models import UpdateWatchlist
+from saas_backend.auth.user_manager.user_manager import UserManager
 
 router = APIRouter(prefix="/anime", tags=["anime"])
 
@@ -34,13 +36,13 @@ async def search_anime(
     print("Searching for fuzzy matches")
     results = process.extract(query, combined_titles, scorer=fuzz.ratio, limit=limit)
 
-    print(results)
-
     results = sorted(results, key=lambda x: x[1], reverse=True)
     results = [result[0] for result in results]
 
-    animes = connection.query(Anime).filter(Anime.title.in_(results)).all()  # type: ignore
-    extra_animes = connection.query(Anime).filter(Anime.extra_titles.like(f"%{query}%")).all()  # type: ignore
+    animes = connection.query(Anime).filter(Anime.title.in_(results)).all()
+    extra_animes = (
+        connection.query(Anime).filter(Anime.extra_titles.like(f"%{query}%")).all()
+    )
 
     animes = list(
         {anime.title.lower(): anime for anime in [*animes, *extra_animes]}.values()
@@ -63,15 +65,15 @@ async def search_anime_tags(query: str, limit: int = 10, offset: int = 0):
 
     total_count = (
         connection.query(Anime)
-        .filter(Anime.tags.like(f"%{query}%"))  # type: ignore
-        .filter(Anime.status.notlike("UPCOMING"))  # type: ignore
+        .filter(Anime.tags.like(f"%{query}%"))
+        .filter(Anime.status.notlike("UPCOMING"))
         .count()
     )
 
     animes_with_tag = (
         connection.query(Anime)
-        .filter(Anime.tags.like(f"%{query}%"))  # type: ignore
-        .filter(Anime.status.notlike("UPCOMING"))  # type: ignore
+        .filter(Anime.tags.like(f"%{query}%"))
+        .filter(Anime.status.notlike("UPCOMING"))
         .order_by(Anime.rating.desc())
         .offset(offset)
         .limit(limit)
@@ -86,29 +88,48 @@ async def search_anime_tags(query: str, limit: int = 10, offset: int = 0):
 
 @router.get("/recommendations")
 async def get_anime_recommendations(
-    ids: list[int] = Query(default=[]), limit: int = Query(default=10)
+    ids: list[int] = Query(default=[]),
+    limit: int = Query(default=10),
+    from_watchlist: bool = Query(default=False),
+    user: User = Depends(UserManager.get_user_from_header),
+    db: Session = Depends(get_db),
 ):
-    return await get_recommendations(limit, ids)
+    watched_anime = get_user_watched_anime(user.id, db)
+
+    return await get_recommendations(
+        db,
+        limit,
+        ids if ids else [anime.id for anime in watched_anime],
+        from_watchlist=from_watchlist,
+    )
 
 
 @router.get("/watchlists")
 async def get_watchlists(user: User = Depends(UserManager.get_user_from_header)):
     connection = next(get_db())
-    watchlist = connection.query(Watchlist).filter(Watchlist.user_id == user.id).first()  # type: ignore
+    watchlist = connection.query(Watchlist).filter(Watchlist.user_id == user.id).first()
 
     if not watchlist:
         watchlist = Watchlist(user_id=user.id)
         connection.add(watchlist)
         connection.commit()
 
-    watchlist_to_anime = connection.query(WatchlistToAnime).filter(WatchlistToAnime.watchlist_id == watchlist.id).all()  # type: ignore
+    watchlist_to_anime = (
+        connection.query(WatchlistToAnime)
+        .filter(WatchlistToAnime.watchlist_id == watchlist.id)
+        .all()
+    )
 
     animes = [
         {"id": anime.anime_id, "status": anime.status, "user_rating": anime.rating}
         for anime in watchlist_to_anime
     ]
 
-    watchlist_animes = connection.query(Anime).filter(Anime.id.in_([anime["id"] for anime in animes])).all()  # type: ignore
+    watchlist_animes = (
+        connection.query(Anime)
+        .filter(Anime.id.in_([anime["id"] for anime in animes]))
+        .all()
+    )
 
     # Create a dictionary to map anime IDs to their status
     anime_status_map = {
@@ -142,7 +163,7 @@ async def update_watchlists(
 ):
     connection = next(get_db())
 
-    watchlist = connection.query(Watchlist).filter(Watchlist.user_id == user.id).first()  # type: ignore
+    watchlist = connection.query(Watchlist).filter(Watchlist.user_id == user.id).first()
 
     if not watchlist:
         new_watchlist = Watchlist(user_id=user.id)
@@ -155,8 +176,8 @@ async def update_watchlists(
             anime_to_watchlist = (
                 connection.query(WatchlistToAnime)
                 .filter(
-                    WatchlistToAnime.watchlist_id == watchlist.id,  # type: ignore
-                    WatchlistToAnime.anime_id == anime,  # type: ignore
+                    WatchlistToAnime.watchlist_id == watchlist.id,
+                    WatchlistToAnime.anime_id == anime,
                 )
                 .first()
             )  #
@@ -181,7 +202,11 @@ async def delete_watchlist_entry(
     _: User = Depends(UserManager.get_user_from_header),
 ):
     connection = next(get_db())
-    watchlist_to_anime = connection.query(WatchlistToAnime).filter(WatchlistToAnime.anime_id == anime_id).first()  # type: ignore
+    watchlist_to_anime = (
+        connection.query(WatchlistToAnime)
+        .filter(WatchlistToAnime.anime_id == anime_id)
+        .first()
+    )
 
     if not watchlist_to_anime:
         raise HTTPException(status_code=404, detail="Watchlist entry not found")
@@ -195,17 +220,21 @@ async def delete_watchlist_entry(
 @router.get("/stats")
 async def get_anime_stats(user: User = Depends(UserManager.get_user_from_header)):
     connection = next(get_db())
-    watchlist = connection.query(Watchlist).filter(Watchlist.user_id == user.id).first()  # type: ignore
+    watchlist = connection.query(Watchlist).filter(Watchlist.user_id == user.id).first()
 
     if not watchlist:
         return JSONResponse(status_code=404, content={"message": "No watchlist found"})
 
     # Fetch all anime in the user's watchlist
-    watchlist_to_anime = connection.query(WatchlistToAnime).filter(WatchlistToAnime.watchlist_id == watchlist.id).all()  # type: ignore
+    watchlist_to_anime = (
+        connection.query(WatchlistToAnime)
+        .filter(WatchlistToAnime.watchlist_id == watchlist.id)
+        .all()
+    )
 
     # Get anime details
     anime_ids = [entry.anime_id for entry in watchlist_to_anime]
-    animes = connection.query(Anime).filter(Anime.id.in_(anime_ids)).all()  # type: ignore
+    animes = connection.query(Anime).filter(Anime.id.in_(anime_ids)).all()
 
     # Calculate statistics
     total_anime_watched = len(animes)
@@ -237,17 +266,24 @@ async def rate_anime(
     anime_id: int, rating: int, user: User = Depends(UserManager.get_user_from_header)
 ):
     connection = next(get_db())
-    anime = connection.query(Anime).filter(Anime.id == anime_id).first()  # type: ignore
+    anime = connection.query(Anime).filter(Anime.id == anime_id).first()
 
     if not anime:
         raise HTTPException(status_code=404, detail="Anime not found")
 
-    watchlist = connection.query(Watchlist).filter(Watchlist.user_id == user.id).first()  # type: ignore
+    watchlist = connection.query(Watchlist).filter(Watchlist.user_id == user.id).first()
 
     if not watchlist:
         raise HTTPException(status_code=404, detail="Watchlist not found")
 
-    watchlist_to_anime = connection.query(WatchlistToAnime).filter(WatchlistToAnime.anime_id == anime_id, WatchlistToAnime.watchlist_id == watchlist.id).first()  # type: ignore
+    watchlist_to_anime = (
+        connection.query(WatchlistToAnime)
+        .filter(
+            WatchlistToAnime.anime_id == anime_id,
+            WatchlistToAnime.watchlist_id == watchlist.id,
+        )
+        .first()
+    )
 
     if not watchlist_to_anime:
         raise HTTPException(status_code=404, detail="Watchlist entry not found")
@@ -262,12 +298,16 @@ async def rate_anime(
 @router.get("/{id}")
 async def get_anime(id: int):
     connection = next(get_db())
-    anime = connection.query(Anime).filter(Anime.id == id).first()  # type: ignore
+    anime = connection.query(Anime).filter(Anime.id == id).first()
 
     if anime is None:
         raise HTTPException(status_code=404, detail="Anime not found")
 
-    anime_to_watchlist = connection.query(WatchlistToAnime).filter(WatchlistToAnime.anime_id == id).first()  # type: ignore
+    anime_to_watchlist = (
+        connection.query(WatchlistToAnime)
+        .filter(WatchlistToAnime.anime_id == id)
+        .first()
+    )
 
     if anime_to_watchlist:
         anime.watchlist_status = anime_to_watchlist.status

@@ -1,13 +1,16 @@
-import hashlib
+# STL
 import os
-from saas_backend.auth.database import get_db
+import hashlib
+
+# LOCAL
 from saas_backend.auth.models import (
-    Anime,
-    AnimeStatus,
     User,
+    Anime,
     Watchlist,
+    AnimeStatus,
     WatchlistToAnime,
 )
+from saas_backend.auth.database import get_db
 from saas_backend.scripts.load_database import load_database
 
 
@@ -17,7 +20,7 @@ def on_startup():
     if not connection.query(Anime).count():
         load_database()
 
-    admin_user = connection.query(User).filter(User.username == "admin").first()  # type: ignore
+    admin_user = connection.query(User).filter(User.username == "admin").first()
 
     if not admin_user:
         admin_user = User(
@@ -35,14 +38,16 @@ def on_startup():
         connection.close()
         return
 
-    watchlist = connection.query(Watchlist).filter(Watchlist.user_id == admin_user.id).first()  # type: ignore
+    watchlist = (
+        connection.query(Watchlist).filter(Watchlist.user_id == admin_user.id).first()
+    )
 
     if not watchlist:
         watchlist = Watchlist(id=999, user_id=admin_user.id)
 
     anime_to_watchlist = (
         connection.query(WatchlistToAnime)
-        .filter(WatchlistToAnime.watchlist_id == watchlist.id)  # type: ignore
+        .filter(WatchlistToAnime.watchlist_id == watchlist.id)
         .first()
     )
 

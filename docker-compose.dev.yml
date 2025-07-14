@@ -7,7 +7,7 @@ services:
     command: bash /start.sh
     env_file: .env
     environment:
-      - APP_MODE=DEV
+      - APP_LEVEL=DEV
     volumes:
       - ./frontend/public:/app/public
       - ./frontend/src:/app/src
