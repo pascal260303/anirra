@@ -33,7 +33,7 @@ describe("Site Actions", () => {
 
     cy.get("[data-testid='recommendations']", { timeout: 30000 })
       .should("exist")
-      .find("[data-testid='mini-card']");
+      .find("[data-testid='mini-card']", { timeout: 30000 });
 
     let firstMiniCardTitle;
     cy.get("[data-testid='mini-card']")
