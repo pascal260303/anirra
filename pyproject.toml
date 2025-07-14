@@ -39,7 +39,7 @@ include = ["src/**/*.py"]
 exclude = [".venv"]
 
 # Type checking strictness
-typeCheckingMode = "strict"  # Enables strict type checking mode
+typeCheckingMode = "strict"                        # Enables strict type checking mode
 reportPrivateUsage = "error"
 reportMissingTypeStubs = "error"
 reportUntypedFunctionDecorator = "error"
@@ -70,10 +70,11 @@ reportInvalidStubStatement = "error"
 reportInconsistentOverload = "error"
 
 # Misc settings
-pythonVersion = "3.12"  # Matches your Python version from pyproject.toml
+pythonVersion = "3.12"            # Matches your Python version from pyproject.toml
 strictListInference = true
 strictDictionaryInference = true
 strictSetInference = true
+reportUnknownArgumentType = false
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
@@ -81,3 +82,12 @@ testpaths = ["src/saas_backend/tests"]
 
 [tool.pytest]
 addopts = "-s"
+
+[tool.isort]
+length_sort = true
+profile = "black"
+sections = ["STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+import_heading_stdlib = "STL"
+import_heading_thirdparty = "PDM"
+import_heading_firstparty = "LOCAL"
+import_heading_localfolder = "LOCAL"

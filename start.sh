@@ -15,4 +15,6 @@ else
     export BACKEND_COMMAND="pdm run python -m uvicorn src.saas_backend.app:app --reload --host 0.0.0.0 --port 8000"
 fi
 
+echo $APP_LEVEL
+
 /usr/bin/supervisord -c /supervisor.conf

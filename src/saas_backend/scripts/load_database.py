@@ -1,8 +1,10 @@
-import json
+# STL
 import os
+import json
 
-from saas_backend.auth.database import get_db
+# LOCAL
 from saas_backend.auth.models import Anime
+from saas_backend.auth.database import get_db
 
 JSON_DATA_PATH = os.getenv(
     "JSON_DATA_PATH", "./offline-data/anime-offline-database.json"
@@ -38,7 +40,24 @@ def load_database():
             tags=anime.get("tags", []),
             sources=anime.get("sources", []),
             extra_titles=anime.get("synonyms", []),
-            reccomendation_string=f"{anime.get('title')} {anime.get('season')} {anime.get('year')} {' '.join(anime.get('tags', []))}",
+            reccomendation_string=" ".join(
+                filter(
+                    None,
+                    [
+                        anime.get("title", ""),
+                        anime.get("season", ""),
+                        str(anime.get("year", "")),
+                        " ".join(anime.get("tags", [])),
+                        " ".join(anime.get("sources", [])),
+                        " ".join(anime.get("synonyms", [])),
+                        anime.get("status", ""),
+                        str(anime.get("episodes", "")),
+                        anime.get("description", ""),
+                        " ".join(anime.get("genres", [])),
+                        " ".join(anime.get("demographics", [])),
+                    ],
+                )
+            ),
         )
 
         connection.add(anime_model)

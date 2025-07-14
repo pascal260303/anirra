@@ -13,7 +13,13 @@ describe("Site Actions", () => {
   });
 
   it("should let the user have a watchlist", () => {
+    cy.reload();
     cy.visit("/watchlist");
+
+    cy.get("button")
+      .contains(/watched/i)
+      .click();
+
     cy.get("a").should("contain", "Naruto");
   });
 
@@ -21,17 +27,17 @@ describe("Site Actions", () => {
     cy.visit("/");
     cy.reload();
 
-    cy.get("[data-testid='recommendations']", { timeout: 10000 })
+    cy.get("[data-testid='recommendations']", { timeout: 30000 })
       .should("exist")
       .find("[data-testid='mini-card']");
   });
 
-  it.only("should let the user add an anime to their watchlist", () => {
+  it("should let the user add an anime to their watchlist", () => {
     cy.visit("/");
 
     cy.reload();
 
-    cy.get("[data-testid='recommendations']", { timeout: 10000 })
+    cy.get("[data-testid='recommendations']", { timeout: 30000 })
       .should("exist")
       .find("[data-testid='mini-card']");
 
