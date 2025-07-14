@@ -17,6 +17,10 @@ runs:
       run: make build up
       shell: bash
 
+    - name: Install frontend dependencies
+      shell: bash
+      run: cd frontend && npm install
+
     - name: Run Cypress tests
       shell: bash
       run: cd frontend && npm run cypress:run
