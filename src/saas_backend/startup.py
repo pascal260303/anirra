@@ -53,7 +53,7 @@ def on_startup():
 
     if not anime_to_watchlist:
         anime_to_watchlist = WatchlistToAnime(
-            watchlist_id=999, anime_id=20766, status=AnimeStatus.WATCHING
+            watchlist_id=999, anime_id=20766, status=AnimeStatus.WATCHED, rating=10
         )
 
     connection.add(watchlist)
