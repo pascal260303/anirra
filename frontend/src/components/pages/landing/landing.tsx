@@ -1,10 +1,12 @@
 import classes from "./landing.module.css";
-import { useSession } from "next-auth/react";
+import { useSession, signIn, getSession } from "next-auth/react";
 import useUser from "@/hooks/useUser";
 import { Anime } from "@/types/anime.types";
 import { Recommendations } from "@/components/shared/recommendations/recommendations";
 import Link from "next/link";
 import Head from "next/head";
+import { useEffect } from "react";
+import { SettingsService } from "@/lib/settings-service";
 
 export type LandingProps = {
   stats: {
@@ -16,8 +18,48 @@ export type LandingProps = {
 };
 
 export const Landing = ({ stats, recommendedAnime = [] }: LandingProps) => {
-  const { data: session } = useSession();
-  const { user } = useUser();
+  const { data: session, status } = useSession();
+  const { user, updateUser } = useUser();
+
+  // Auto-login when header authentication is enabled and no session is present
+  useEffect(() => {
+    const headerAuthEnabled =
+      (process.env.HEADER_AUTH_ENABLED || "false").toString().toLowerCase() in [
+        "1",
+        "true",
+        "yes",
+      ];
+
+    const doAutoLogin = async () => {
+      try {
+        const res = await signIn("credentials", {
+          redirect: false,
+          username: "",
+          password: "",
+        });
+
+        if (res && !res.error) {
+          const s = await getSession();
+          const settings = await SettingsService.checkSettings();
+          if (s?.user) {
+            updateUser({
+              username: s.user.username,
+              creditBalance: s.user.startingCredits,
+              settings,
+            });
+          }
+          // Reload to trigger SSR with authenticated JWT for stats/recommendations
+          window.location.reload();
+        }
+      } catch (e) {
+        // ignore – user will see the default landing
+      }
+    };
+
+    if (headerAuthEnabled && status === "unauthenticated") {
+      void doAutoLogin();
+    }
+  }, [status, updateUser]);
 
   if (
     !session ||
