@@ -20,8 +20,26 @@ export default function SignOutPage() {
           throw new Error("Failed to log out from the backend");
         }
 
-        signOut({ callbackUrl: "/" });
+        const headerAuthEnabled =
+          (process.env.HEADER_AUTH_ENABLED || "false").toString().toLowerCase() in [
+            "1",
+            "true",
+            "yes",
+          ];
+        const externalLogoutUrl = process.env.HEADER_AUTH_LOGOUT_URL || "";
+
+        // Clear NextAuth session and local state first
+        await signOut({ redirect: false });
         updateUser({});
+
+        if (headerAuthEnabled && externalLogoutUrl) {
+          // Redirect user to the identity provider end-session URL
+          window.location.href = externalLogoutUrl;
+          return;
+        }
+
+        // Fallback to home
+        window.location.href = "/";
       } catch (err) {
         console.error("Error during sign-out API call:", err);
         setError(err instanceof Error ? err.message : "Unknown error");

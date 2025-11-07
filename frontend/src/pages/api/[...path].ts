@@ -29,6 +29,23 @@ export default async function handler(
   const headers = new AxiosHeaders({
     "Content-Type": contentType,
   });
+
+  // Forward proxy auth headers if present (for header-based auth)
+  const usernameHeaderName =
+    process.env.HEADER_AUTH_USERNAME_HEADER || "x-authentik-username";
+  const emailHeaderName =
+    process.env.HEADER_AUTH_EMAIL_HEADER || "x-authentik-email";
+
+  const incomingHeaders = req.headers;
+  const forwardedUsername = incomingHeaders[usernameHeaderName.toLowerCase()];
+  const forwardedEmail = incomingHeaders[emailHeaderName.toLowerCase()];
+
+  if (forwardedUsername) {
+    headers.set(usernameHeaderName, String(forwardedUsername));
+  }
+  if (forwardedEmail) {
+    headers.set(emailHeaderName, String(forwardedEmail));
+  }
   const body = req.body;
 
   const forwardPath = Array.isArray(path) ? path.join("/") : `/${path}`;

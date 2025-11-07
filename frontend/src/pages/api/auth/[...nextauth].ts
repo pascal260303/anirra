@@ -24,12 +24,34 @@ export const authOptions: NextAuthOptions = {
         username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
+        const headerAuthEnabled = (process.env.HEADER_AUTH_ENABLED || "false")
+          .toString()
+          .toLowerCase() in ["1", "true", "yes"];
+
+        const loginPath = headerAuthEnabled ? "/header-login" : "/login";
+
+        const usernameHeaderName =
+          process.env.HEADER_AUTH_USERNAME_HEADER || "X-Authentik-Username";
+        const emailHeaderName =
+          process.env.HEADER_AUTH_EMAIL_HEADER || "X-Authentik-Email";
+
+        const extraHeaders: Record<string, string> = {};
+        const incomingHeaders = (req as any)?.headers || {};
+        const userHdr = incomingHeaders[usernameHeaderName.toLowerCase()];
+        const mailHdr = incomingHeaders[emailHeaderName.toLowerCase()];
+        if (userHdr) extraHeaders[usernameHeaderName] = String(userHdr);
+        if (mailHdr) extraHeaders[emailHeaderName] = String(mailHdr);
+
         const response = await fetch(
-          `${process.env.API_URL || "http://127.0.0.1:8000"}/login`,
+          `${process.env.API_URL || "http://127.0.0.1:8000"}${loginPath}`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              ...extraHeaders,
+            },
+            // For header-auth, the body will be ignored by the backend
             body: new URLSearchParams({
               username: credentials?.username || "",
               password: credentials?.password || "",
@@ -50,7 +72,7 @@ export const authOptions: NextAuthOptions = {
         const decoded = jwt.verify(
           access_token || "",
           process.env.JWT_SECRET ||
-            "cQMmaBUdU4M2i6CcPufbsr+ZJkmtux9wH8Y0ZaxQEKA="
+          "cQMmaBUdU4M2i6CcPufbsr+ZJkmtux9wH8Y0ZaxQEKA="
         ) as unknown as ExtendedUser;
 
         if (response.ok && access_token) {
