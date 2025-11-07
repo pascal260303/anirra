@@ -11,12 +11,9 @@ export default async function GetServerSideProps(
   // provided a username header, attempt a server-side header-login so we can
   // set the cookie and then redirect to reload the page with the cookie present.
   if (!jwt) {
-    const headerAuthEnabled =
-      (process.env.HEADER_AUTH_ENABLED || "false").toString().toLowerCase() in [
-        "1",
-        "true",
-        "yes",
-      ];
+    const headerAuthEnabled = ["1", "true", "yes"].includes(
+      (process.env.HEADER_AUTH_ENABLED || "false").toString().toLowerCase()
+    );
 
     if (headerAuthEnabled) {
       const usernameHeaderName =
@@ -30,8 +27,8 @@ export default async function GetServerSideProps(
 
       if (username) {
         try {
-          // Forward the proxy headers to the backend /header-login endpoint
-          const backendUrl = `${process.env.API_URL || "http://127.0.0.1:8000"}/header-login`;
+          // Forward the proxy headers to the unified /login endpoint (header auth mode)
+          const backendUrl = `${process.env.API_URL || "http://127.0.0.1:8000"}/login`;
           const res = await fetch(backendUrl, {
             method: "POST",
             headers: {

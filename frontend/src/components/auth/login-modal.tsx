@@ -41,7 +41,7 @@ export default function AuthModal({ isOpen, setIsOpen }: AuthModalProps) {
     e.preventDefault();
 
     if (isLogin) {
-      // In header-auth mode, trigger a credential-less sign-in that hits /header-login
+      // In header-auth mode, unified /login endpoint ignores credentials and uses proxy headers
       const res = await signIn("credentials", {
         redirect: false,
         username,

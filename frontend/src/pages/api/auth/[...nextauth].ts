@@ -25,11 +25,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials, req) {
-        const headerAuthEnabled = (process.env.HEADER_AUTH_ENABLED || "false")
-          .toString()
-          .toLowerCase() in ["1", "true", "yes"];
-
-        const loginPath = headerAuthEnabled ? "/header-login" : "/login";
+        const loginPath = "/login"; // unified endpoint handles both modes
 
         const usernameHeaderName =
           process.env.HEADER_AUTH_USERNAME_HEADER || "X-Authentik-Username";
@@ -51,7 +47,7 @@ export const authOptions: NextAuthOptions = {
               "Content-Type": "application/x-www-form-urlencoded",
               ...extraHeaders,
             },
-            // For header-auth, the body will be ignored by the backend
+            // When header-auth enabled backend ignores body and uses proxy headers
             body: new URLSearchParams({
               username: credentials?.username || "",
               password: credentials?.password || "",
@@ -64,23 +60,31 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid credentials");
         }
 
-        const access_token = response.headers
-          .get("Set-Cookie")
-          ?.split(";")[0]
-          .split("=")[1];
-
-        const decoded = jwt.verify(
-          access_token || "",
-          process.env.JWT_SECRET ||
-          "cQMmaBUdU4M2i6CcPufbsr+ZJkmtux9wH8Y0ZaxQEKA="
-        ) as unknown as ExtendedUser;
+        // Prefer JSON body token (backend may return access_token in JSON)
+        let access_token: string | undefined;
+        try {
+          const data = await response.clone().json().catch(() => null);
+          access_token = data?.access_token;
+        } catch { }
+        // Fallback to parsing Set-Cookie
+        if (!access_token) {
+          access_token = response.headers
+            .get("Set-Cookie")
+            ?.split(";")[0]
+            .split("=")[1];
+        }
 
         if (response.ok && access_token) {
+          const decoded = jwt.verify(
+            access_token || "",
+            process.env.JWT_SECRET ||
+            "cQMmaBUdU4M2i6CcPufbsr+ZJkmtux9wH8Y0ZaxQEKA="
+          ) as unknown as ExtendedUser;
           return {
             access_token,
             id: decoded.id,
             username: decoded.username,
-            startingCredits: decoded.credits,
+            startingCredits: (decoded as any).credits,
           };
         }
 

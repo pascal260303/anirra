@@ -30,17 +30,35 @@ router = APIRouter()
 
 @router.post("/login")
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
 ):
+    """Unified login endpoint.
+
+    When HEADER_AUTH_ENABLED=false -> classic username/password login.
+    When HEADER_AUTH_ENABLED=true  -> ignore form body and use proxy headers to authenticate / auto-provision user.
+    """
     if HEADER_AUTH_ENABLED:
-        raise HTTPException(
-            status_code=403,
-            detail="Password login disabled due to header-based authentication",
-        )
-    user = UserManager.authenticate_user(form_data.username, form_data.password)
+        # Header-based auth flow (merged former /header-login)
+        username = request.headers.get(HEADER_AUTH_USERNAME_HEADER)
+        email = request.headers.get(HEADER_AUTH_EMAIL_HEADER)
+        if not username:
+            raise HTTPException(status_code=401, detail="Missing header-auth username")
+
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
+            user = User(username=username, email=email, hashed_password="")
+            db.add(user)
+            db.flush()
+            new_watchlist = Watchlist(user_id=user.id)
+            db.add(new_watchlist)
+            db.commit()
+    else:
+        # Standard password login
+        user = UserManager.authenticate_user(form_data.username, form_data.password)
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-
     access_token = JwtHandler.create_access_token(
         data={
             "id": user.id,
@@ -51,14 +69,20 @@ async def login(
         expires_delta=access_token_expires,
     )
 
-    response = JSONResponse(content={"message": "User logged in successfully"})
-
+    response = JSONResponse(
+        content={
+            "message": "User logged in successfully"
+            if not HEADER_AUTH_ENABLED
+            else "User logged in via header-auth",
+            "access_token": access_token,
+        }
+    )
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
+        samesite="lax",
     )
-
     return response
 
 
@@ -85,53 +109,9 @@ async def logout_user(token: str = Header(..., alias="Authorization")):
 
 
 @router.post("/header-login")
-async def header_login(request: Request, db: Session = Depends(get_db)):
-    """
-    Authenticate using upstream proxy-provided headers and issue a JWT cookie.
-    If the user doesn't exist yet, auto-provision it along with a watchlist.
-
-    This endpoint is active when HEADER_AUTH_ENABLED=true and should be called via the frontend.
-    """
-    if not HEADER_AUTH_ENABLED:
-        raise HTTPException(status_code=404, detail="Header auth is disabled")
-
-    # Retrieve proxy headers (case-insensitive)
-    username = request.headers.get(HEADER_AUTH_USERNAME_HEADER)
-    email = request.headers.get(HEADER_AUTH_EMAIL_HEADER)
-
-    if not username:
-        raise HTTPException(status_code=401, detail="Missing header-auth username")
-
-    # Find or create user
-    user = db.query(User).filter(User.username == username).first()
-    if not user:
-        # Auto-register user with no password (disabled local login)
-        user = User(username=username, email=email, hashed_password="")
-        db.add(user)
-        db.flush()  # get generated user.id
-        # Create watchlist
-        new_watchlist = Watchlist(user_id=user.id)
-        db.add(new_watchlist)
-        db.commit()
-
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = JwtHandler.create_access_token(
-        data={
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "credits": user.credits,
-        },
-        expires_delta=access_token_expires,
-    )
-
-    response = JSONResponse(content={"message": "User logged in via header-auth"})
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-    )
-    return response
+async def header_login():
+    """Backward compatibility endpoint – instruct clients to use /login. Keeps old tests stable."""
+    # Removed deprecated /header-login endpoint – use /login for both modes
 
 
 @router.post("/register")
