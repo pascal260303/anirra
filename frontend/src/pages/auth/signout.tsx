@@ -20,13 +20,12 @@ export default function SignOutPage() {
           throw new Error("Failed to log out from the backend");
         }
 
-        const headerAuthEnabled =
-          (process.env.HEADER_AUTH_ENABLED || "false").toString().toLowerCase() in [
-            "1",
-            "true",
-            "yes",
-          ];
-        const externalLogoutUrl = process.env.HEADER_AUTH_LOGOUT_URL || "";
+        // Prefer runtime-config injected at container start, then fall back to env
+        const rc = (globalThis as any)?.__RUNTIME_CONFIG__;
+        const headerAuthEnabled = rc && rc.HEADER_AUTH_ENABLED !== undefined
+          ? ["1", "true", "yes"].includes(String(rc.HEADER_AUTH_ENABLED).toLowerCase())
+          : ((process.env.NEXT_PUBLIC_HEADER_AUTH_ENABLED ?? process.env.HEADER_AUTH_ENABLED ?? "false").toString().toLowerCase() in ["1", "true", "yes"]);
+        const externalLogoutUrl = rc?.HEADER_AUTH_LOGOUT_URL ?? process.env.NEXT_PUBLIC_HEADER_AUTH_LOGOUT_URL ?? process.env.HEADER_AUTH_LOGOUT_URL ?? "";
 
         // Clear NextAuth session and local state first
         await signOut({ redirect: false });

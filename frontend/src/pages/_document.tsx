@@ -22,6 +22,8 @@ export default function Document() {
       </Head>
       <body className="antialiased" style={{ height: "100vh" }}>
         <Main />
+        {/* runtime-config.js is generated at container start and exposes envs to the client */}
+        <script src="/runtime-config.js"></script>
         <NextScript />
       </body>
     </Html>

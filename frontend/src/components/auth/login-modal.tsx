@@ -25,10 +25,17 @@ export default function AuthModal({ isOpen, setIsOpen }: AuthModalProps) {
   const [password, setPassword] = useState("");
   const { updateUser } = useUser();
   const router = useRouter();
-  const headerAuthEnabled =
-    (process.env.HEADER_AUTH_ENABLED || "false")
-      .toString()
-      .toLowerCase() in ["1", "true", "yes"];
+  const readHeaderAuthEnabled = () => {
+    try {
+      const rc = (globalThis as any)?.__RUNTIME_CONFIG__;
+      if (rc && rc.HEADER_AUTH_ENABLED !== undefined) {
+        return ["1", "true", "yes"].includes(String(rc.HEADER_AUTH_ENABLED).toLowerCase());
+      }
+    } catch { }
+    const envVal = (process.env.NEXT_PUBLIC_HEADER_AUTH_ENABLED ?? process.env.HEADER_AUTH_ENABLED ?? "false").toString();
+    return ["1", "true", "yes"].includes(envVal.toLowerCase());
+  };
+  const headerAuthEnabled = readHeaderAuthEnabled();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

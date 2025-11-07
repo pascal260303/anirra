@@ -21,14 +21,24 @@ export const Landing = ({ stats, recommendedAnime = [] }: LandingProps) => {
   const { data: session, status } = useSession();
   const { user, updateUser } = useUser();
 
+  // Helper to read runtime-config generated at container start, with fallbacks
+  const readHeaderAuthEnabled = () => {
+    try {
+      // window.__RUNTIME_CONFIG__ is injected by start.sh at container start
+      const rc = (globalThis as any)?.__RUNTIME_CONFIG__;
+      if (rc && rc.HEADER_AUTH_ENABLED !== undefined) {
+        const v = String(rc.HEADER_AUTH_ENABLED || "false");
+        return ["1", "true", "yes"].includes(v.toLowerCase());
+      }
+    } catch { }
+
+    const envVal = (process.env.NEXT_PUBLIC_HEADER_AUTH_ENABLED ?? process.env.HEADER_AUTH_ENABLED ?? "false").toString();
+    return ["1", "true", "yes"].includes(envVal.toLowerCase());
+  };
+
   // Auto-login when header authentication is enabled and no session is present
   useEffect(() => {
-    const headerAuthEnabled =
-      (process.env.HEADER_AUTH_ENABLED || "false").toString().toLowerCase() in [
-        "1",
-        "true",
-        "yes",
-      ];
+    const headerAuthEnabled = readHeaderAuthEnabled();
 
     const doAutoLogin = async () => {
       try {
@@ -76,6 +86,16 @@ export const Landing = ({ stats, recommendedAnime = [] }: LandingProps) => {
           <p>
             Track your anime watching habits and get personalized
             recommendations
+          </p>
+          {/* Indicator whether frontend read the header-auth env var at build time */}
+          <p style={{ marginTop: 8, fontSize: 12, color: "#6b7280" }}>
+            {readHeaderAuthEnabled() ? (
+              <>
+                Header-based authentication is <strong>ENABLED</strong> (frontend runtime config)
+              </>
+            ) : (
+              <>Header-based authentication is <strong>disabled</strong> (frontend runtime config)</>
+            )}
           </p>
         </div>
       </>
